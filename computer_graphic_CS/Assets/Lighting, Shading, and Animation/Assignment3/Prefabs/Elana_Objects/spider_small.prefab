@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &445969766289143246
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7791380387774591088}
+  - component: {fileID: 2788733446322128726}
+  - component: {fileID: -3579929670100868639}
+  m_Layer: 0
+  m_Name: spider_small
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7791380387774591088
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 445969766289143246}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: -0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: -20, y: 0.2, z: 0}
+  m_LocalScale: {x: 0.2, y: 0.2, z: 0.2}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2788733446322128726
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 445969766289143246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bb55c6b45c6a42439c37033eba660e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  legCount: 8
+  headRadius: 0.8
+  bodyRadius: 0.35
+  upperLegLength: 0.75
+  lowerLegLength: 1.5
+  footLength: 0.1
+  legThickness: 0.04
+  smallSpiderMaterial: {fileID: 2100000, guid: 337a830070aa84494a24a847edb3ed3b, type: 2}
+  pupilMaterial: {fileID: 2100000, guid: 819eb0a5ec63e457a8e9d8e7014f381b, type: 2}
+  legSpreadAngle: -45
+  leftPupilJoint: {fileID: 0}
+  rightPupilJoint: {fileID: 0}
+  headTransform: {fileID: 0}
+  bodyTransform: {fileID: 0}
+  legJoints: []
+  kneeJoints: []
+--- !u!114 &-3579929670100868639
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 445969766289143246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80bc3e83207c7411d87a0ea6e608de53, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spider: {fileID: 0}
+  eyeRotationSpeed: 2
+  eyeRotationAmount: 15
+  animateEyes: 1
+  animateLegs: 1
+  legWaveSpeed: 0.5
+  legWaveAmount: 12
+  legPhaseOffset: 0.5
+  animateKnees: 1
+  kneeFlexAmount: 30
