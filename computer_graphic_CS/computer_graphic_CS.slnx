@@ -1,4 +1,10 @@
 ﻿<Solution>
+  <Project Path="Unity.Splines.csproj" />
+  <Project Path="Unity.Splines.Editor.csproj" />
+  <Project Path="Unity.Mathematics.csproj" />
+  <Project Path="Unity.VisualStudio.Editor.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="Unity.Settings.Editor.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Unity.Mathematics.Editor.csproj" />
 </Solution>
