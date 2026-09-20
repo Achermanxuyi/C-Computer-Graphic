@@ -6,7 +6,7 @@ public class Task3 : MonoBehaviour
 {
     void Start()
     {
-        transform.localPosition = new Vector3(8f, 4f, 0f);
+        transform.localPosition = new Vector3(6f, 4f, 0f);
         transform.localRotation = Quaternion.identity;
         transform.localScale = Vector3.one;
 
@@ -131,12 +131,12 @@ public static class T3MeshUtilities
             
             // Front face (CCW from front view)
             triangles.Add(outerCurr);
-            triangles.Add(innerCurr);
             triangles.Add(outerNext);
+            triangles.Add(innerCurr);
             
             triangles.Add(outerNext);
-            triangles.Add(innerCurr);
             triangles.Add(innerNext);
+            triangles.Add(innerCurr);
         }
 
         // Create back face triangles (flat shaded)
@@ -151,12 +151,12 @@ public static class T3MeshUtilities
             
             // Back face (CW from front view = CCW from back view)
             triangles.Add(outerCurr);
-            triangles.Add(outerNext);
             triangles.Add(innerCurr);
+            triangles.Add(outerNext);
             
             triangles.Add(outerNext);
-            triangles.Add(innerNext);
             triangles.Add(innerCurr);
+            triangles.Add(innerNext);
         }
 
         // Create smooth-shaded outer rim (connecting front and back outer edges)

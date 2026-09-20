@@ -13,7 +13,7 @@ public class Task4 : MonoBehaviour
         Mesh keyMesh = T4MeshUtilities.YeOldeKey(
             divisions: 32,
             headRadius: 1.0f,
-            holesRadius: 0.2f,
+            holesRadius: 0.6f,
             holesOffset: new Vector2(0.4f, 0.3f),
             thickness: 0.3f,
             stemLength: 3.0f,
@@ -64,61 +64,35 @@ public static class T4MeshUtilities
         return mesh;
     }
 
-    // holes issue (claude helped, but failed)
     private static void GenerateOldeKeyHead(List<Vector3> vertices, List<int> triangles,
         int divisions, float headRadius, float holesRadius, Vector2 holesOffset, float thickness)
     {
         float halfThickness = thickness * 0.5f;
-        List<Vector3> frontOuterVerts = new List<Vector3>();
-        List<Vector3> frontHole1Verts = new List<Vector3>();
-        List<Vector3> frontHole2Verts = new List<Vector3>();
+        List<Vector3> frontOuterVerts = new List<Vector3>(divisions);
+        List<Vector3> frontHoleVerts = new List<Vector3>(divisions);
+        List<Vector3> backOuterVerts = new List<Vector3>(divisions);
+        List<Vector3> backHoleVerts = new List<Vector3>(divisions);
 
+        // The hole is centered in the club head. The old offset is kept in the
+        // method signature so existing callers do not need to change.
+        Vector2 holeCenter = Vector2.zero;
         for (int i = 0; i < divisions; i++)
         {
             float angle = (float)i / divisions * Mathf.PI * 2f;
             float cos = Mathf.Cos(angle);
             float sin = Mathf.Sin(angle);
+            float outerRadius = ClubBoundaryRadius(angle, headRadius);
 
-            // Outer circle
-            frontOuterVerts.Add(new Vector3(cos * headRadius, sin * headRadius, halfThickness));
-
-            // First hole (positive offset)
-            frontHole1Verts.Add(new Vector3(
-                holesOffset.x + cos * holesRadius,
-                holesOffset.y + sin * holesRadius,
+            frontOuterVerts.Add(new Vector3(cos * outerRadius, sin * outerRadius, halfThickness));
+            frontHoleVerts.Add(new Vector3(
+                holeCenter.x + cos * holesRadius,
+                holeCenter.y + sin * holesRadius,
                 halfThickness
             ));
-
-            // Second hole (mirrored - negative y offset)
-            frontHole2Verts.Add(new Vector3(
-                holesOffset.x + cos * holesRadius,
-                -holesOffset.y + sin * holesRadius,
-                halfThickness
-            ));
-        }
-
-        // Back face (z = -halfThickness)
-        List<Vector3> backOuterVerts = new List<Vector3>();
-        List<Vector3> backHole1Verts = new List<Vector3>();
-        List<Vector3> backHole2Verts = new List<Vector3>();
-
-        for (int i = 0; i < divisions; i++)
-        {
-            float angle = (float)i / divisions * Mathf.PI * 2f;
-            float cos = Mathf.Cos(angle);
-            float sin = Mathf.Sin(angle);
-
-            backOuterVerts.Add(new Vector3(cos * headRadius, sin * headRadius, -halfThickness));
-
-            backHole1Verts.Add(new Vector3(
-                holesOffset.x + cos * holesRadius,
-                holesOffset.y + sin * holesRadius,
-                -halfThickness
-            ));
-
-            backHole2Verts.Add(new Vector3(
-                holesOffset.x + cos * holesRadius,
-                -holesOffset.y + sin * holesRadius,
+            backOuterVerts.Add(new Vector3(cos * outerRadius, sin * outerRadius, -halfThickness));
+            backHoleVerts.Add(new Vector3(
+                holeCenter.x + cos * holesRadius,
+                holeCenter.y + sin * holesRadius,
                 -halfThickness
             ));
         }
@@ -127,18 +101,15 @@ public static class T4MeshUtilities
 
         // Add all face vertices
         vertices.AddRange(frontOuterVerts);
-        vertices.AddRange(frontHole1Verts);
-        vertices.AddRange(frontHole2Verts);
+        vertices.AddRange(frontHoleVerts);
         vertices.AddRange(backOuterVerts);
-        vertices.AddRange(backHole1Verts);
-        vertices.AddRange(backHole2Verts);
+        vertices.AddRange(backHoleVerts);
 
-        // Create front face triangulation (annulus with two holes)
-        TriangulateAnnulusWithTwoHoles(triangles, baseIdx, divisions, true);
+        // Create the front and back faces as a ring around the hollow center.
+        TriangulateAnnulus(triangles, baseIdx, divisions, true);
 
-        // Create back face triangulation
-        int backBaseIdx = baseIdx + divisions * 3;
-        TriangulateAnnulusWithTwoHoles(triangles, backBaseIdx, divisions, false);
+        int backBaseIdx = baseIdx + divisions * 2;
+        TriangulateAnnulus(triangles, backBaseIdx, divisions, false);
 
         // Create smooth-shaded outer rim
         int outerRimStartIdx = vertices.Count;
@@ -147,7 +118,8 @@ public static class T4MeshUtilities
             float angle = (float)i / divisions * Mathf.PI * 2f;
             float cos = Mathf.Cos(angle);
             float sin = Mathf.Sin(angle);
-            Vector3 pos = new Vector3(cos * headRadius, sin * headRadius, 0);
+            float outerRadius = ClubBoundaryRadius(angle, headRadius);
+            Vector3 pos = new Vector3(cos * outerRadius, sin * outerRadius, 0);
 
             vertices.Add(pos + Vector3.forward * halfThickness);
             vertices.Add(pos - Vector3.forward * halfThickness);
@@ -171,9 +143,68 @@ public static class T4MeshUtilities
             triangles.Add(nextBack);
         }
 
-        // Create smooth-shaded rims for both holes
-        CreateHoleRim(vertices, triangles, divisions, holesOffset, holesRadius, halfThickness);
-        CreateHoleRim(vertices, triangles, divisions, new Vector2(holesOffset.x, -holesOffset.y), holesRadius, halfThickness);
+        // Create the curved inner wall of the single hollow opening.
+        CreateHoleRim(vertices, triangles, divisions, holeCenter, holesRadius, halfThickness);
+    }
+
+    private static float ClubBoundaryRadius(float angle, float scale)
+    {
+        Vector2 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+        Vector2[] lobeCenters =
+        {
+            new Vector2(-0.42f, 0.28f) * scale,
+            new Vector2(0.42f, 0.28f) * scale,
+            new Vector2(0f, -0.28f) * scale
+        };
+        float lobeRadius = 0.62f * scale;
+        float boundary = 0f;
+
+        for (int i = 0; i < lobeCenters.Length; i++)
+        {
+            float projection = Vector2.Dot(lobeCenters[i], direction);
+            float discriminant = lobeRadius * lobeRadius
+                - Vector2.Dot(lobeCenters[i], lobeCenters[i])
+                + projection * projection;
+
+            if (discriminant >= 0f)
+            {
+                boundary = Mathf.Max(boundary, projection + Mathf.Sqrt(discriminant));
+            }
+        }
+
+        return boundary;
+    }
+
+    private static void TriangulateAnnulus(List<int> triangles, int baseIdx, int divisions, bool front)
+    {
+        int holeBaseIdx = baseIdx + divisions;
+        for (int i = 0; i < divisions; i++)
+        {
+            int next = (i + 1) % divisions;
+            int outerCurr = baseIdx + i;
+            int outerNext = baseIdx + next;
+            int holeCurr = holeBaseIdx + i;
+            int holeNext = holeBaseIdx + next;
+
+            if (front)
+            {
+                triangles.Add(outerCurr);
+                triangles.Add(outerNext);
+                triangles.Add(holeCurr);
+                triangles.Add(outerNext);
+                triangles.Add(holeNext);
+                triangles.Add(holeCurr);
+            }
+            else
+            {
+                triangles.Add(outerCurr);
+                triangles.Add(holeCurr);
+                triangles.Add(outerNext);
+                triangles.Add(outerNext);
+                triangles.Add(holeCurr);
+                triangles.Add(holeNext);
+            }
+        }
     }
 
 
@@ -207,22 +238,22 @@ public static class T4MeshUtilities
                 if (front)
                 {
                     triangles.Add(outerCurr);
-                    triangles.Add(hole1Curr);
                     triangles.Add(outerNext);
+                    triangles.Add(hole1Curr);
 
                     triangles.Add(outerNext);
-                    triangles.Add(hole1Curr);
                     triangles.Add(hole1Next);
+                    triangles.Add(hole1Curr);
                 }
                 else
                 {
                     triangles.Add(outerCurr);
-                    triangles.Add(outerNext);
                     triangles.Add(hole1Curr);
+                    triangles.Add(outerNext);
 
                     triangles.Add(outerNext);
-                    triangles.Add(hole1Next);
                     triangles.Add(hole1Curr);
+                    triangles.Add(hole1Next);
                 }
             }
             else if (!upperHalf && !nextUpperHalf)
@@ -231,22 +262,22 @@ public static class T4MeshUtilities
                 if (front)
                 {
                     triangles.Add(outerCurr);
-                    triangles.Add(hole2Curr);
                     triangles.Add(outerNext);
+                    triangles.Add(hole2Curr);
 
                     triangles.Add(outerNext);
-                    triangles.Add(hole2Curr);
                     triangles.Add(hole2Next);
+                    triangles.Add(hole2Curr);
                 }
                 else
                 {
                     triangles.Add(outerCurr);
-                    triangles.Add(outerNext);
                     triangles.Add(hole2Curr);
+                    triangles.Add(outerNext);
 
                     triangles.Add(outerNext);
-                    triangles.Add(hole2Next);
                     triangles.Add(hole2Curr);
+                    triangles.Add(hole2Next);
                 }
             }
             else
@@ -262,8 +293,8 @@ public static class T4MeshUtilities
                 else
                 {
                     triangles.Add(outerCurr);
-                    triangles.Add(hole1Curr);
                     triangles.Add(outerNext);
+                    triangles.Add(hole1Curr);
                 }
             }
         }
@@ -349,12 +380,12 @@ public static class T4MeshUtilities
             int nextEnd = stemStartIdx + next;
 
             triangles.Add(currStart);
-            triangles.Add(currEnd);
             triangles.Add(nextStart);
+            triangles.Add(currEnd);
 
             triangles.Add(nextStart);
-            triangles.Add(currEnd);
             triangles.Add(nextEnd);
+            triangles.Add(currEnd);
         }
 
         // Create connection cap between head and stem (flat shaded)
@@ -469,51 +500,51 @@ public static class T4MeshUtilities
 
         // Top face
         triangles.Add(baseIdx);
+        triangles.Add(baseIdx + 2);
         triangles.Add(baseIdx + 1);
-        triangles.Add(baseIdx + 2);
         triangles.Add(baseIdx);
-        triangles.Add(baseIdx + 2);
         triangles.Add(baseIdx + 3);
+        triangles.Add(baseIdx + 2);
 
         // Bottom face
         triangles.Add(baseIdx + 4);
-        triangles.Add(baseIdx + 6);
         triangles.Add(baseIdx + 5);
-        triangles.Add(baseIdx + 4);
-        triangles.Add(baseIdx + 7);
         triangles.Add(baseIdx + 6);
+        triangles.Add(baseIdx + 4);
+        triangles.Add(baseIdx + 6);
+        triangles.Add(baseIdx + 7);
 
         // Side faces
         // Front face (-z)
         triangles.Add(baseIdx);
-        triangles.Add(baseIdx + 4);
-        triangles.Add(baseIdx + 1);
         triangles.Add(baseIdx + 1);
         triangles.Add(baseIdx + 4);
+        triangles.Add(baseIdx + 1);
         triangles.Add(baseIdx + 5);
+        triangles.Add(baseIdx + 4);
 
         // Back face (+z)
         triangles.Add(baseIdx + 3);
-        triangles.Add(baseIdx + 2);
         triangles.Add(baseIdx + 7);
         triangles.Add(baseIdx + 2);
+        triangles.Add(baseIdx + 2);
+        triangles.Add(baseIdx + 7);
         triangles.Add(baseIdx + 6);
-        triangles.Add(baseIdx + 7);
 
         // Left face (-x)
         triangles.Add(baseIdx);
-        triangles.Add(baseIdx + 3);
         triangles.Add(baseIdx + 4);
         triangles.Add(baseIdx + 3);
+        triangles.Add(baseIdx + 3);
+        triangles.Add(baseIdx + 4);
         triangles.Add(baseIdx + 7);
-        triangles.Add(baseIdx + 4);
 
         // Right face (+x)
         triangles.Add(baseIdx + 1);
-        triangles.Add(baseIdx + 5);
-        triangles.Add(baseIdx + 2);
         triangles.Add(baseIdx + 2);
         triangles.Add(baseIdx + 5);
+        triangles.Add(baseIdx + 2);
         triangles.Add(baseIdx + 6);
+        triangles.Add(baseIdx + 5);
     }
 }

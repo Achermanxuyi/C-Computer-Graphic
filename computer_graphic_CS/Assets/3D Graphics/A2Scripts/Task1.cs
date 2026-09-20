@@ -5,7 +5,7 @@ public class Task1 : MonoBehaviour
 {
     void Start()
     {
-        transform.localPosition = new Vector3(0, 0.1f, 0);
+        transform.localPosition = new Vector3(0, 1, 0);
 
         // Create sub-objects
         CreateHatCrown();

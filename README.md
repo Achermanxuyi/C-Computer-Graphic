@@ -35,12 +35,9 @@
 | Object Name | Related Task |
 |--------------|---------------|
 | BowlerHat | Task 1 |
-| LegoMan | Task 2 |
+| LegoMan | Task 2 | 
 | Key | Task 3 |
 | OldKey | Task 4 |
 
 ---
 
-## Acknowledgment
-I sincerely apologize for the multiple delays.  
-Thank you so much for your support and understanding.
