@@ -33,6 +33,8 @@ public class Task4 : MonoBehaviour
 
 public static class T4MeshUtilities
 {
+    private const float HoleOverlapCenterOffsetRatio = 0.75f;
+
     public static Mesh YeOldeKey(
         int divisions,
         float headRadius,
@@ -47,14 +49,19 @@ public static class T4MeshUtilities
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
 
-        // Generate the key head 
+        float circleCenterOffset = Mathf.Min(
+            headRadius * 0.6f,
+            holesRadius * HoleOverlapCenterOffsetRatio);
+        float stemStartX = Mathf.Sqrt(headRadius * headRadius - circleCenterOffset * circleCenterOffset) - 0.08f;
+
+        // Generate the key head
         GenerateOldeKeyHead(vertices, triangles, divisions, headRadius, holesRadius, holesOffset, thickness);
 
         // Generate the cylindrical stem
-        GenerateCylindricalStem(vertices, triangles, divisions, headRadius, stemLength, stemRadius, thickness);
+        GenerateCylindricalStem(vertices, triangles, divisions, stemStartX, stemLength, stemRadius, thickness);
 
         // Generate the code region (teeth at the end)
-        GenerateCodeRegion(vertices, triangles, divisions, stemLength, stemRadius, keyCode);
+        GenerateCodeRegion(vertices, triangles, divisions, stemStartX + stemLength, stemRadius, keyCode);
 
         mesh.vertices = vertices.ToArray();
         mesh.triangles = triangles.ToArray();
@@ -67,281 +74,175 @@ public static class T4MeshUtilities
     private static void GenerateOldeKeyHead(List<Vector3> vertices, List<int> triangles,
         int divisions, float headRadius, float holesRadius, Vector2 holesOffset, float thickness)
     {
-        float halfThickness = thickness * 0.5f;
-        List<Vector3> frontOuterVerts = new List<Vector3>(divisions);
-        List<Vector3> frontHoleVerts = new List<Vector3>(divisions);
-        List<Vector3> backOuterVerts = new List<Vector3>(divisions);
-        List<Vector3> backHoleVerts = new List<Vector3>(divisions);
-
-        // The hole is centered in the club head. The old offset is kept in the
-        // method signature so existing callers do not need to change.
-        Vector2 holeCenter = Vector2.zero;
-        for (int i = 0; i < divisions; i++)
+        float centerOffset = Mathf.Min(
+            headRadius * 0.6f,
+            holesRadius * HoleOverlapCenterOffsetRatio);
+        Vector2[] circleCenters =
         {
-            float angle = (float)i / divisions * Mathf.PI * 2f;
-            float cos = Mathf.Cos(angle);
-            float sin = Mathf.Sin(angle);
-            float outerRadius = ClubBoundaryRadius(angle, headRadius);
+            new Vector2(0f, -centerOffset),
+            new Vector2(0f, centerOffset)
+        };
 
-            frontOuterVerts.Add(new Vector3(cos * outerRadius, sin * outerRadius, halfThickness));
-            frontHoleVerts.Add(new Vector3(
-                holeCenter.x + cos * holesRadius,
-                holeCenter.y + sin * holesRadius,
-                halfThickness
-            ));
-            backOuterVerts.Add(new Vector3(cos * outerRadius, sin * outerRadius, -halfThickness));
-            backHoleVerts.Add(new Vector3(
-                holeCenter.x + cos * holesRadius,
-                holeCenter.y + sin * holesRadius,
-                -halfThickness
-            ));
-        }
-
-        int baseIdx = vertices.Count;
-
-        // Add all face vertices
-        vertices.AddRange(frontOuterVerts);
-        vertices.AddRange(frontHoleVerts);
-        vertices.AddRange(backOuterVerts);
-        vertices.AddRange(backHoleVerts);
-
-        // Create the front and back faces as a ring around the hollow center.
-        TriangulateAnnulus(triangles, baseIdx, divisions, true);
-
-        int backBaseIdx = baseIdx + divisions * 2;
-        TriangulateAnnulus(triangles, backBaseIdx, divisions, false);
-
-        // Create smooth-shaded outer rim
-        int outerRimStartIdx = vertices.Count;
-        for (int i = 0; i < divisions; i++)
+        for (int i = 0; i < circleCenters.Length; i++)
         {
-            float angle = (float)i / divisions * Mathf.PI * 2f;
-            float cos = Mathf.Cos(angle);
-            float sin = Mathf.Sin(angle);
-            float outerRadius = ClubBoundaryRadius(angle, headRadius);
-            Vector3 pos = new Vector3(cos * outerRadius, sin * outerRadius, 0);
-
-            vertices.Add(pos + Vector3.forward * halfThickness);
-            vertices.Add(pos - Vector3.forward * halfThickness);
+            GenerateHollowCircle(vertices, triangles, divisions, circleCenters[i],
+                headRadius, holesRadius, thickness);
         }
-
-        for (int i = 0; i < divisions; i++)
-        {
-            int next = (i + 1) % divisions;
-
-            int currFront = outerRimStartIdx + i * 2;
-            int currBack = outerRimStartIdx + i * 2 + 1;
-            int nextFront = outerRimStartIdx + next * 2;
-            int nextBack = outerRimStartIdx + next * 2 + 1;
-
-            triangles.Add(currFront);
-            triangles.Add(currBack);
-            triangles.Add(nextFront);
-
-            triangles.Add(nextFront);
-            triangles.Add(currBack);
-            triangles.Add(nextBack);
-        }
-
-        // Create the curved inner wall of the single hollow opening.
-        CreateHoleRim(vertices, triangles, divisions, holeCenter, holesRadius, halfThickness);
     }
 
-    private static float ClubBoundaryRadius(float angle, float scale)
+    private static void GenerateHollowCircle(List<Vector3> vertices, List<int> triangles,
+        int divisions, Vector2 center, float outerRadius, float innerRadius, float thickness)
     {
-        Vector2 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
-        Vector2[] lobeCenters =
-        {
-            new Vector2(-0.42f, 0.28f) * scale,
-            new Vector2(0.42f, 0.28f) * scale,
-            new Vector2(0f, -0.28f) * scale
-        };
-        float lobeRadius = 0.62f * scale;
-        float boundary = 0f;
+        float halfThickness = thickness * 0.5f;
+        float bevel = Mathf.Min(
+            thickness * 0.25f,
+            (outerRadius - innerRadius) * 0.25f,
+            innerRadius * 0.25f);
+        List<Vector2> outerProfile = CreateRoundedRimProfile(outerRadius, halfThickness, bevel, false);
+        List<Vector2> innerProfile = CreateRoundedRimProfile(innerRadius, halfThickness, bevel, true);
+        List<int> outerRows = AddCircularProfile(vertices, divisions, center, outerProfile);
+        List<int> innerRows = AddCircularProfile(vertices, divisions, center, innerProfile);
 
-        for (int i = 0; i < lobeCenters.Length; i++)
-        {
-            float projection = Vector2.Dot(lobeCenters[i], direction);
-            float discriminant = lobeRadius * lobeRadius
-                - Vector2.Dot(lobeCenters[i], lobeCenters[i])
-                + projection * projection;
+        TriangulateAnnulus(triangles, outerRows[0], innerRows[0], divisions, true);
+        TriangulateAnnulus(
+            triangles,
+            outerRows[outerRows.Count - 1],
+            innerRows[innerRows.Count - 1],
+            divisions,
+            false);
 
-            if (discriminant >= 0f)
+        ConnectCircularProfile(triangles, outerRows, divisions, false);
+        ConnectCircularProfile(triangles, innerRows, divisions, true);
+    }
+
+    private static List<Vector2> CreateRoundedRimProfile(
+        float radius, float halfThickness, float bevel, bool inner)
+    {
+        const int bevelSegments = 4;
+        const int sideSegments = 2;
+        List<Vector2> profile = new List<Vector2>();
+        float bevelRadiusSign = inner ? 1f : -1f;
+
+        for (int i = 0; i <= bevelSegments; i++)
+        {
+            float angle = (float)i / bevelSegments * Mathf.PI * 0.5f;
+            float profileRadius = radius + bevelRadiusSign * bevel * Mathf.Cos(angle);
+            float z = halfThickness - bevel + bevel * Mathf.Cos(angle);
+            profile.Add(new Vector2(profileRadius, z));
+        }
+
+        float sideZ = halfThickness - bevel;
+        for (int i = 1; i <= sideSegments; i++)
+        {
+            float t = (float)i / (sideSegments + 1);
+            profile.Add(new Vector2(radius, Mathf.Lerp(sideZ, -sideZ, t)));
+        }
+        profile.Add(new Vector2(radius, -sideZ));
+
+        for (int i = bevelSegments - 1; i >= 0; i--)
+        {
+            float angle = (float)i / bevelSegments * Mathf.PI * 0.5f;
+            float profileRadius = radius + bevelRadiusSign * bevel * Mathf.Cos(angle);
+            float z = -halfThickness + bevel - bevel * Mathf.Cos(angle);
+            profile.Add(new Vector2(profileRadius, z));
+        }
+
+        return profile;
+    }
+
+    private static List<int> AddCircularProfile(
+        List<Vector3> vertices, int divisions, Vector2 center, List<Vector2> profile)
+    {
+        List<int> rowStarts = new List<int>(profile.Count);
+        foreach (Vector2 crossSection in profile)
+        {
+            rowStarts.Add(vertices.Count);
+            for (int i = 0; i < divisions; i++)
             {
-                boundary = Mathf.Max(boundary, projection + Mathf.Sqrt(discriminant));
+                float angle = (float)i / divisions * Mathf.PI * 2f;
+                vertices.Add(new Vector3(
+                    center.x + Mathf.Cos(angle) * crossSection.x,
+                    center.y + Mathf.Sin(angle) * crossSection.x,
+                    crossSection.y));
             }
         }
 
-        return boundary;
+        return rowStarts;
     }
 
-    private static void TriangulateAnnulus(List<int> triangles, int baseIdx, int divisions, bool front)
+    private static void TriangulateAnnulus(
+        List<int> triangles, int outerBaseIdx, int innerBaseIdx, int divisions, bool front)
     {
-        int holeBaseIdx = baseIdx + divisions;
         for (int i = 0; i < divisions; i++)
         {
             int next = (i + 1) % divisions;
-            int outerCurr = baseIdx + i;
-            int outerNext = baseIdx + next;
-            int holeCurr = holeBaseIdx + i;
-            int holeNext = holeBaseIdx + next;
+            int outerCurr = outerBaseIdx + i;
+            int outerNext = outerBaseIdx + next;
+            int innerCurr = innerBaseIdx + i;
+            int innerNext = innerBaseIdx + next;
 
             if (front)
             {
                 triangles.Add(outerCurr);
                 triangles.Add(outerNext);
-                triangles.Add(holeCurr);
+                triangles.Add(innerCurr);
                 triangles.Add(outerNext);
-                triangles.Add(holeNext);
-                triangles.Add(holeCurr);
+                triangles.Add(innerNext);
+                triangles.Add(innerCurr);
             }
             else
             {
                 triangles.Add(outerCurr);
-                triangles.Add(holeCurr);
+                triangles.Add(innerCurr);
                 triangles.Add(outerNext);
                 triangles.Add(outerNext);
-                triangles.Add(holeCurr);
-                triangles.Add(holeNext);
+                triangles.Add(innerCurr);
+                triangles.Add(innerNext);
             }
         }
     }
 
-
-    // claude debugging (but failed)
-    private static void TriangulateAnnulusWithTwoHoles(List<int> triangles, int baseIdx, int divisions, bool front)
+    private static void ConnectCircularProfile(
+        List<int> triangles, List<int> rowStarts, int divisions, bool inner)
     {
-        // Triangulate the annulus with two holes
-
-        for (int i = 0; i < divisions; i++)
+        for (int row = 0; row < rowStarts.Count - 1; row++)
         {
-            int next = (i + 1) % divisions;
-
-            int outerCurr = baseIdx + i;
-            int outerNext = baseIdx + next;
-            int hole1Curr = baseIdx + divisions + i;
-            int hole1Next = baseIdx + divisions + next;
-            int hole2Curr = baseIdx + divisions * 2 + i;
-            int hole2Next = baseIdx + divisions * 2 + next;
-
-            // Determine which segments connect to which hole based on angle
-            float angle = (float)i / divisions * Mathf.PI * 2f;
-            float nextAngle = (float)next / divisions * Mathf.PI * 2f;
-
-            // Upper half connects to hole1, lower half connects to hole2
-            bool upperHalf = Mathf.Sin(angle) >= 0;
-            bool nextUpperHalf = Mathf.Sin(nextAngle) >= 0;
-
-            if (upperHalf && nextUpperHalf)
+            int currentRow = rowStarts[row];
+            int nextRow = rowStarts[row + 1];
+            for (int i = 0; i < divisions; i++)
             {
-                // Connect to first hole
-                if (front)
-                {
-                    triangles.Add(outerCurr);
-                    triangles.Add(outerNext);
-                    triangles.Add(hole1Curr);
+                int next = (i + 1) % divisions;
+                int current = currentRow + i;
+                int currentNext = currentRow + next;
+                int nextProfile = nextRow + i;
+                int nextProfileNext = nextRow + next;
 
-                    triangles.Add(outerNext);
-                    triangles.Add(hole1Next);
-                    triangles.Add(hole1Curr);
+                if (inner)
+                {
+                    triangles.Add(current);
+                    triangles.Add(currentNext);
+                    triangles.Add(nextProfile);
+                    triangles.Add(currentNext);
+                    triangles.Add(nextProfileNext);
+                    triangles.Add(nextProfile);
                 }
                 else
                 {
-                    triangles.Add(outerCurr);
-                    triangles.Add(hole1Curr);
-                    triangles.Add(outerNext);
-
-                    triangles.Add(outerNext);
-                    triangles.Add(hole1Curr);
-                    triangles.Add(hole1Next);
+                    triangles.Add(current);
+                    triangles.Add(nextProfile);
+                    triangles.Add(currentNext);
+                    triangles.Add(currentNext);
+                    triangles.Add(nextProfile);
+                    triangles.Add(nextProfileNext);
                 }
             }
-            else if (!upperHalf && !nextUpperHalf)
-            {
-                // Connect to second hole
-                if (front)
-                {
-                    triangles.Add(outerCurr);
-                    triangles.Add(outerNext);
-                    triangles.Add(hole2Curr);
-
-                    triangles.Add(outerNext);
-                    triangles.Add(hole2Next);
-                    triangles.Add(hole2Curr);
-                }
-                else
-                {
-                    triangles.Add(outerCurr);
-                    triangles.Add(hole2Curr);
-                    triangles.Add(outerNext);
-
-                    triangles.Add(outerNext);
-                    triangles.Add(hole2Curr);
-                    triangles.Add(hole2Next);
-                }
-            }
-            else
-            {
-                // Transition region - connect outer to outer
-                // This creates a bridge between the two hole regions
-                if (front)
-                {
-                    triangles.Add(outerCurr);
-                    triangles.Add(outerNext);
-                    triangles.Add(hole1Curr);
-                }
-                else
-                {
-                    triangles.Add(outerCurr);
-                    triangles.Add(outerNext);
-                    triangles.Add(hole1Curr);
-                }
-            }
-        }
-    }
-
-    private static void CreateHoleRim(List<Vector3> vertices, List<int> triangles,
-        int divisions, Vector2 center, float radius, float halfThickness)
-    {
-        int rimStartIdx = vertices.Count;
-
-        for (int i = 0; i < divisions; i++)
-        {
-            float angle = (float)i / divisions * Mathf.PI * 2f;
-            float cos = Mathf.Cos(angle);
-            float sin = Mathf.Sin(angle);
-            Vector3 pos = new Vector3(center.x + cos * radius, center.y + sin * radius, 0);
-
-            vertices.Add(pos + Vector3.forward * halfThickness);
-            vertices.Add(pos - Vector3.forward * halfThickness);
-        }
-
-        for (int i = 0; i < divisions; i++)
-        {
-            int next = (i + 1) % divisions;
-
-            int currFront = rimStartIdx + i * 2;
-            int currBack = rimStartIdx + i * 2 + 1;
-            int nextFront = rimStartIdx + next * 2;
-            int nextBack = rimStartIdx + next * 2 + 1;
-
-            // Reversed winding for inner surface
-            triangles.Add(currFront);
-            triangles.Add(nextFront);
-            triangles.Add(currBack);
-
-            triangles.Add(nextFront);
-            triangles.Add(nextBack);
-            triangles.Add(currBack);
         }
     }
 
     private static void GenerateCylindricalStem(List<Vector3> vertices, List<int> triangles,
-        int divisions, float headRadius, float stemLength, float stemRadius, float thickness)
+        int divisions, float startX, float stemLength, float stemRadius, float thickness)
     {
-        // The stem starts at the right edge of the head and extends along the x-axis
-        float startX = headRadius;
-        float endX = startX + stemLength;
+        float endX = startX + stemLength + 0.1f;
         float halfThickness = thickness * 0.5f;
 
         // Create connection from head to stem (transition from head thickness to stem)
@@ -430,11 +331,10 @@ public static class T4MeshUtilities
     }
 
     private static void GenerateCodeRegion(List<Vector3> vertices, List<int> triangles,
-        int divisions, float stemLength, float stemRadius, float[] keyCode)
+        int divisions, float codeStartX, float stemRadius, float[] keyCode)
     {
         // The code region is at the end of the stem
         
-        float codeStartX = stemLength;
         float segmentLength = stemRadius * 0.5f; // Length of each code segment
         int numSegments = keyCode.Length;
 
@@ -461,14 +361,14 @@ public static class T4MeshUtilities
             triangles.Add(endCapStartIdx + 1 + i);
         }
 
-        // Create simplified code teeth as rectangular protrusions
+        // Place the teeth on the final code-length portion of the stem.
         float toothWidth = stemRadius * 0.4f;
         float toothThickness = stemRadius * 1.8f;
         
         for (int seg = 0; seg < numSegments; seg++)
         {
             float toothLength = stemRadius * keyCode[seg] * 2.5f;
-            float x = codeStartX + (seg + 0.5f) * segmentLength;
+            float x = codeStartX - (numSegments - seg - 0.5f) * segmentLength;
             
             // Create a rectangular tooth extending downward (-y direction)
             CreateTooth(vertices, triangles, x, toothLength, toothWidth, toothThickness);
