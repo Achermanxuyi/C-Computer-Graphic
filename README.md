@@ -50,7 +50,7 @@ Procedural graphics coursework in Unity, progressing from **2D raster drawing** 
 
 ## Getting started
 
-1. Install **Unity 6000.6.0f1** (or open with Unity Hub and let it resolve the editor version).
+1. Open with Unity Hub and let it resolve the editor version).
 2. Open the project at `computer_graphic_CS/`.
 3. Load a scene from the tables below and press **Play**.
 
