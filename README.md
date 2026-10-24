@@ -2,8 +2,8 @@
 
 Procedural graphics coursework in Unity, progressing from **2D raster drawing** → **procedural 3D meshes** → a **cinematic short** with lighting, shading, and animation.
 
-**Author:** Junji Liao (Elana Liao)  
-**Unity:** 6000.6.0f1  
+**Author:** Elana Liao
+**Unity:** 6000.6.7f1  
 **Project folder:** [`computer_graphic_CS/`](./computer_graphic_CS)
 
 ---
